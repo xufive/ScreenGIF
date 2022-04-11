@@ -4,13 +4,13 @@ import os
 import wx
 import wx.adv
 import wx.lib.filebrowsebutton as filebrowse
-from win32con import MOD_CONTROL, VK_F2
 from threading import Thread
 from datetime import datetime
 from configparser import ConfigParser
 from PIL import Image, ImageGrab
 from imageio import mimsave
 from icon import get_fp
+import win32con,win32gui,win32api
 
 class MainFrame(wx.Frame):
     """屏幕录像机主窗口"""
@@ -42,6 +42,8 @@ class MainFrame(wx.Frame):
         
         self.box = [x0, y0, 820, 620]       # 屏幕录像窗口大小
         self.xy = None                      # 鼠标左键按下的位置
+        self.Round = 8                      # 边框外层_圆角矩形_圆半径
+        self.Border_thicknes = 10           # 边框_厚度
         self.recording = False              # 正在录制标志
         self.saveing = False                # 正在生成GIF标志
         self.imgs = list()                  # 每帧的图片列表
@@ -65,7 +67,7 @@ class MainFrame(wx.Frame):
         self.taskBar.Bind(wx.EVT_MENU, self.OnConfig, id=self.MENU_CONFIG)          # 设置
         self.taskBar.Bind(wx.EVT_MENU, self.OnExit, id=self.MENU_EXIT)              # 退出
         
-        self.RegisterHotKey(self.MENU_REC, MOD_CONTROL, VK_F2)                      # 注册热键
+        self.RegisterHotKey(self.MENU_REC, 2, 113)                                  # 注册热键 Ctrl + F2
         self.Bind(wx.EVT_HOTKEY, self.OnRec, id=self.MENU_REC)                      # 开始/停止录制热键
     
     def ReadConfig(self):
@@ -89,10 +91,7 @@ class MainFrame(wx.Frame):
         """设置窗口形状"""
         
         path = wx.GraphicsRenderer.GetDefaultRenderer().CreatePath()
-        
-        self.Round = 8 # 圆角矩形_圆半径
-        self.Border_thicknes = 10 # 边框_厚度
-        
+              
         path.AddRoundedRectangle(self.box[0],
                                     self.box[1],
                                     self.box[2],
@@ -118,67 +117,81 @@ class MainFrame(wx.Frame):
                 self.xy = (evt.x, evt.y)
         elif evt.EventType == wx.EVT_LEFT_UP.evtType[0]: #左键弹起
             self.xy = None
-        elif evt.EventType == wx.EVT_MOTION.evtType[0]:  #鼠标移动
-            if self.box[0] < evt.x < self.box[0]+10:
-                if evt.LeftIsDown() and self.xy:
-                    dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                    self.box[0] += dx
-                    self.box[2] -= dx
-                if self.box[1] < evt.y < self.box[1]+10:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
-                    if evt.LeftIsDown() and self.xy:
-                        self.box[1] += dy
-                        self.box[3] -= dy
-                elif evt.y > self.box[1]+self.box[3]-10:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
-                    if evt.LeftIsDown() and self.xy:
-                        self.box[3] += dy
-                else:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
-            elif self.box[0]+self.box[2]-10 < evt.x < self.box[0]+self.box[2]:
-                if evt.LeftIsDown() and self.xy:
-                    dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                    self.box[2] += dx
-                if self.box[1] < evt.y < self.box[1]+10:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
-                    if evt.LeftIsDown() and self.xy:
-                        self.box[1] += dy
-                        self.box[3] -= dy
-                elif evt.y > self.box[1]+self.box[3]-10:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
-                    if evt.LeftIsDown() and self.xy:
-                        self.box[3] += dy
-                else:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
-            elif self.box[1] < evt.y < self.box[1]+10:
-                self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
-                if evt.LeftIsDown() and self.xy:
-                    dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                    self.box[1] += dy
-                    self.box[3] -= dy
-            elif self.box[1]+self.box[3]-10 < evt.y < self.box[1]+self.box[3]:
-                self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
-                if evt.LeftIsDown() and self.xy:
-                    dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                    self.box[3] += dy
-            
-            if self.box[0] < 0:
-                self.box[2] += self.box[0]
-                self.box[0] = 0
-            if self.box[1] < 0:
-                self.box[3] += self.box[1]
-                self.box[1] = 0
-            
-            w, h = self.GetSize()
-            if self.box[2] > w:
-                self.box[2] = w
-            if self.box[3] > h:
-                self.box[3] = h
-            
+        elif evt.EventType == wx.EVT_RIGHT_DOWN.evtType[0]: #右键按下
             self.xy = (evt.x, evt.y)
-            self.isFullScreen = self.GetSize() == (self.box[2],self.box[3])
-            self.SetWindowShape()
-            self.Refresh()
+        elif evt.EventType == wx.EVT_RIGHT_UP.evtType[0]: #右键抬起
+            self.SetCursor(wx.Cursor(wx.CURSOR_ARROW))
+            self.xy = None
+        elif evt.EventType == wx.EVT_MOTION.evtType[0]:  #鼠标移动
+            if evt.RightIsDown(): # 右键按下
+                self.box[0] -= self.xy[0] - evt.x
+                self.box[1] -= self.xy[1] - evt.y
+                self.xy = (evt.x,evt.y)
+                self.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+                self.SetWindowShape()
+                self.Refresh()
+                
+            else:
+                if self.box[0] < evt.x < self.box[0]+10:
+                    if evt.LeftIsDown() and self.xy:
+                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
+                        self.box[0] += dx
+                        self.box[2] -= dx
+                    if self.box[1] < evt.y < self.box[1]+10:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
+                        if evt.LeftIsDown() and self.xy:
+                            self.box[1] += dy
+                            self.box[3] -= dy
+                    elif evt.y > self.box[1]+self.box[3]-10:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
+                        if evt.LeftIsDown() and self.xy:
+                            self.box[3] += dy
+                    else:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
+                elif self.box[0]+self.box[2]-10 < evt.x < self.box[0]+self.box[2]:
+                    if evt.LeftIsDown() and self.xy:
+                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
+                        self.box[2] += dx
+                    if self.box[1] < evt.y < self.box[1]+10:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
+                        if evt.LeftIsDown() and self.xy:
+                            self.box[1] += dy
+                            self.box[3] -= dy
+                    elif evt.y > self.box[1]+self.box[3]-10:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
+                        if evt.LeftIsDown() and self.xy:
+                            self.box[3] += dy
+                    else:
+                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
+                elif self.box[1] < evt.y < self.box[1]+10:
+                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
+                    if evt.LeftIsDown() and self.xy:
+                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
+                        self.box[1] += dy
+                        self.box[3] -= dy
+                elif self.box[1]+self.box[3]-10 < evt.y < self.box[1]+self.box[3]:
+                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
+                    if evt.LeftIsDown() and self.xy:
+                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
+                        self.box[3] += dy
+                
+                if self.box[0] < 0:
+                    self.box[2] += self.box[0]
+                    self.box[0] = 0
+                if self.box[1] < 0:
+                    self.box[3] += self.box[1]
+                    self.box[1] = 0
+                
+                w, h = self.GetSize()
+                if self.box[2] > w:
+                    self.box[2] = w
+                if self.box[3] > h:
+                    self.box[3] = h
+                
+                self.xy = (evt.x, evt.y)
+                self.isFullScreen = self.GetSize() == (self.box[2],self.box[3])
+                self.SetWindowShape()
+                self.Refresh()
 
     def OnPaint(self, evt):
         """窗口重绘事件处理"""
@@ -253,7 +266,7 @@ class MainFrame(wx.Frame):
 
         self.OnShow(None)
         self.recording = True
-        self.timer.Start(1000/self.cfg.getint("recoder", "fps")) # 启动定时器
+        self.timer.Start(int(1000/self.cfg.getint("recoder", "fps"))) # 启动定时器
         self.Refresh() # 刷新窗口
 
     def StopRec(self):
@@ -288,6 +301,7 @@ class MainFrame(wx.Frame):
         filePath = os.path.join(self.cfg.get("recoder", "outdir"), "%s.gif"%dt)
         fps = self.cfg.getint("recoder", "fps")
         loop = self.cfg.getint("recoder", "loop")
+
         mimsave(filePath, self.imgs, format='GIF', fps=fps, loop=loop)
         self.imgs = list() # 清空截屏记录
         self.saveing = False # 生成gif动画结束
@@ -312,7 +326,7 @@ class MainFrame(wx.Frame):
             self.cfg.set("recoder", "fps", str(dlg.fps.GetValue()))
             self.cfg.set("recoder", "frames", str(dlg.frames.GetValue()))
             self.cfg.set("recoder", "loop", str(dlg.loop.GetValue()))
-            self.cfg.set("recoder", "outdir", dlg.GetOutDir())
+            self.cfg.set("recoder", "outdir", dlg.outdir.GetValue())
             self.cfg.write(open("recorder.ini", "w"))
         
         dlg.Destroy() # 销毁设置对话框
