@@ -89,11 +89,23 @@ class MainFrame(wx.Frame):
         """设置窗口形状"""
         
         path = wx.GraphicsRenderer.GetDefaultRenderer().CreatePath()
-        path.AddRectangle(self.box[0], self.box[1], self.box[2], 10)
-        path.AddRectangle(self.box[0], self.box[1]+self.box[3]-10, self.box[2], 10)
-        path.AddRectangle(self.box[0], self.box[1]+10, 10, self.box[3]-2*10)
-        path.AddRectangle(self.box[0]+self.box[2]-10, self.box[1]+10, 10, self.box[3]-2*10)
         
+        self.Round = 8 # 圆角矩形_圆半径
+        self.Border_thicknes = 10 # 边框_厚度
+        
+        path.AddRoundedRectangle(self.box[0],
+                                    self.box[1],
+                                    self.box[2],
+                                    self.box[3],
+                                    self.Round) # 外层,圆角矩形
+                                    
+        path.AddRectangle(self.box[0] + self.Border_thicknes,
+                            self.box[1] + self.Border_thicknes,
+                            self.box[2] - self.Border_thicknes * 2,
+                            self.box[3] - self.Border_thicknes * 2) # 内层,矩形
+
+        # 路径重叠部分会进行差集计算
+    
         self.SetShape(path) # 设置异形窗口形状
 
     def OnMouse(self, evt):
