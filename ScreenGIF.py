@@ -1,5 +1,4 @@
 # -*- coding:utf-8 -*-
-
 import os
 import wx
 import wx.adv
@@ -24,7 +23,7 @@ class MainFrame(wx.Frame):
     MENU_EXIT   = wx.NewIdRef()      # 退出
 
     def __init__(self, parent):
-        wx.Frame.__init__(self, parent, -1, "", style=wx.FRAME_SHAPED|wx.FRAME_NO_TASKBAR|wx.STAY_ON_TOP)
+        wx.Frame.__init__(self, parent, -1, "", style=wx.FRAME_SHAPED|wx.FRAME_NO_TASKBAR|wx.RESIZE_BORDER|wx.STAY_ON_TOP)
         
         im = Image.open(get_fp()) # 读图标的二进制数据，转为PIL对象
         bmp = wx.Bitmap.FromBufferRGBA(im.size[0], im.size[1], im.tobytes()) # PIL对象转为wx.Bitmap对象
@@ -34,16 +33,16 @@ class MainFrame(wx.Frame):
         x, y, w, h = wx.ClientDisplayRect() # 屏幕显示区域
         x0, y0 = (w-820)//2, (h-620)//2 # 录像窗口位置（默认大小820x620，边框10像素）
         
-        self.SetPosition((x, y)) # 无标题窗口最大化：设置位置
-        self.SetSize((w, h)) # 无标题窗口最大化：设置大小
+        self.SetPosition((x0, y0)) # 无标题窗口最大化：设置位置
+        self.SetSize((820, 620)) # 无标题窗口最大化：设置大小
         self.SetDoubleBuffered(True) # 启用双缓冲
         self.taskBar = wx.adv.TaskBarIcon()  # 添加系统托盘
         self.taskBar.SetIcon(icon, "屏幕录像机")
         
-        self.box = [x0, y0, 820, 620]       # 屏幕录像窗口大小
+        self.box = [x, y, 820, 620]         # 屏幕录像窗口大小
         self.xy = None                      # 鼠标左键按下的位置
         self.Round = 8                      # 边框外层_圆角矩形_圆半径
-        self.Border_thicknes = 10           # 边框_厚度
+        self.Border_thicknes = 15           # 边框_厚度
         self.recording = False              # 正在录制标志
         self.saveing = False                # 正在生成GIF标志
         self.imgs = list()                  # 每帧的图片列表
@@ -51,10 +50,11 @@ class MainFrame(wx.Frame):
         self.cfg = self.ReadConfig()        # 读取配置项
         self.SetWindowShape()               # 设置不规则窗口
         
-        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)                                # 鼠标事件
+        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)                                  # 鼠标事件
         self.Bind(wx.EVT_PAINT, self.OnPaint)                                       # 窗口重绘
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBG)                          # 擦除背景
         self.Bind(wx.EVT_TIMER, self.OnTimer, self.timer)                           # 定时器
+        self.Bind(wx.EVT_SIZE, self.OnMainResize)                           
         
         self.taskBar.Bind(wx.adv.EVT_TASKBAR_RIGHT_UP, self.OnTaskBar)              # 右键单击托盘图标
         self.taskBar.Bind(wx.adv.EVT_TASKBAR_LEFT_UP, self.OnTaskBar)               # 左键单击托盘图标
@@ -107,92 +107,30 @@ class MainFrame(wx.Frame):
     
         self.SetShape(path) # 设置异形窗口形状
 
+    def OnMainResize(self, evt):
+        self.box[2] = evt.GetSize()[0]
+        self.box[3] = evt.GetSize()[1]
+        print(self.box)
+        self.SetWindowShape()
+        self.Refresh()
+
+    def moveWindow(self, hWnd: int):
+        """ 移动窗口
+        ---
+        hWnd: int or `sip.voidptr`
+            窗口句柄
+        tips: 在wxpython中,请传入self.GetHandel()
+        """
+        
+        win32gui.ReleaseCapture()
+        win32api.SendMessage(hWnd, win32con.WM_SYSCOMMAND,
+                    win32con.SC_MOVE + win32con.HTCAPTION, 0)
+
     def OnMouse(self, evt):
         """鼠标事件"""
-        
-        if evt.EventType == wx.EVT_LEFT_DOWN.evtType[0]: #左键按下
-            if self.box[0]+10 <= evt.x <= self.box[0]+self.box[2]-10 and self.box[1]+10 <= evt.y <= self.box[1]+self.box[3]-10:
-                self.xy = None
-            else:
-                self.xy = (evt.x, evt.y)
-        elif evt.EventType == wx.EVT_LEFT_UP.evtType[0]: #左键弹起
-            self.xy = None
-        elif evt.EventType == wx.EVT_RIGHT_DOWN.evtType[0]: #右键按下
-            self.xy = (evt.x, evt.y)
-        elif evt.EventType == wx.EVT_RIGHT_UP.evtType[0]: #右键抬起
-            self.SetCursor(wx.Cursor(wx.CURSOR_ARROW))
-            self.xy = None
-        elif evt.EventType == wx.EVT_MOTION.evtType[0]:  #鼠标移动
-            if evt.RightIsDown(): # 右键按下
-                self.box[0] -= self.xy[0] - evt.x
-                self.box[1] -= self.xy[1] - evt.y
-                self.xy = (evt.x,evt.y)
-                self.SetCursor(wx.Cursor(wx.CURSOR_HAND))
-                self.SetWindowShape()
-                self.Refresh()
+        self.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+        self.moveWindow(self.GetHandle())
                 
-            else:
-                if self.box[0] < evt.x < self.box[0]+10:
-                    if evt.LeftIsDown() and self.xy:
-                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                        self.box[0] += dx
-                        self.box[2] -= dx
-                    if self.box[1] < evt.y < self.box[1]+10:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
-                        if evt.LeftIsDown() and self.xy:
-                            self.box[1] += dy
-                            self.box[3] -= dy
-                    elif evt.y > self.box[1]+self.box[3]-10:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
-                        if evt.LeftIsDown() and self.xy:
-                            self.box[3] += dy
-                    else:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
-                elif self.box[0]+self.box[2]-10 < evt.x < self.box[0]+self.box[2]:
-                    if evt.LeftIsDown() and self.xy:
-                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                        self.box[2] += dx
-                    if self.box[1] < evt.y < self.box[1]+10:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
-                        if evt.LeftIsDown() and self.xy:
-                            self.box[1] += dy
-                            self.box[3] -= dy
-                    elif evt.y > self.box[1]+self.box[3]-10:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZENWSE))
-                        if evt.LeftIsDown() and self.xy:
-                            self.box[3] += dy
-                    else:
-                        self.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
-                elif self.box[1] < evt.y < self.box[1]+10:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
-                    if evt.LeftIsDown() and self.xy:
-                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                        self.box[1] += dy
-                        self.box[3] -= dy
-                elif self.box[1]+self.box[3]-10 < evt.y < self.box[1]+self.box[3]:
-                    self.SetCursor(wx.Cursor(wx.CURSOR_SIZENS))
-                    if evt.LeftIsDown() and self.xy:
-                        dx, dy = evt.x-self.xy[0], evt.y-self.xy[1]
-                        self.box[3] += dy
-                
-                if self.box[0] < 0:
-                    self.box[2] += self.box[0]
-                    self.box[0] = 0
-                if self.box[1] < 0:
-                    self.box[3] += self.box[1]
-                    self.box[1] = 0
-                
-                w, h = self.GetSize()
-                if self.box[2] > w:
-                    self.box[2] = w
-                if self.box[3] > h:
-                    self.box[3] = h
-                
-                self.xy = (evt.x, evt.y)
-                self.isFullScreen = self.GetSize() == (self.box[2],self.box[3])
-                self.SetWindowShape()
-                self.Refresh()
-
     def OnPaint(self, evt):
         """窗口重绘事件处理"""
         
@@ -236,8 +174,16 @@ class MainFrame(wx.Frame):
 
     def OnTimer(self, evt):
         """定时器事件处理：截图"""
-        
-        img = ImageGrab.grab((self.box[0]+10, self.box[1]+10, self.box[0]+self.box[2]-10, self.box[1]+self.box[3]-10))
+        self.encoding_size = (self.GetPosition()[0] + self.Border_thicknes,
+                                self.GetPosition()[1] + self.Border_thicknes,
+                                self.box[2] - 2 * self.Border_thicknes,
+                                self.box[3] - 2 * self.Border_thicknes) # 截图区域
+
+        img = ImageGrab.grab((self.encoding_size[0]+10,
+                                self.encoding_size[1]+10,
+                                self.encoding_size[0]+self.encoding_size[2]-10,
+                                self.encoding_size[1]+self.encoding_size[3]-10))
+
         self.imgs.append(img)
 
         if len(self.imgs) >= self.cfg.getint("recoder", "frames"):
@@ -247,11 +193,13 @@ class MainFrame(wx.Frame):
         """显示窗口"""
 
         self.Iconize(False)
+        self.Show()
 
     def OnHide(self, evt):
         """隐藏窗口"""
 
         self.Iconize(True)
+        self.Hide() # 隐藏窗口,因为使用最小化时边框无法错误地无法隐藏
 
     def OnRec(self, evt):
         """开始/停止录制菜单事件处理"""
