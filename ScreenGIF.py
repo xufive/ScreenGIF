@@ -174,7 +174,7 @@ class MainFrame(wx.Frame):
         dc = wx.PaintDC(self)
         dc.SetBrush(wx.RED_BRUSH if self.recording else wx.GREEN_BRUSH)
         w, h = self.GetSize()
-        dc.DrawRectangle(*self.box,)
+        dc.DrawRectangle(0,0,w,h)
 
     def OnEraseBG(self, evt):
         """擦除背景事件处理"""
