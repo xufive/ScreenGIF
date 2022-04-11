@@ -185,8 +185,8 @@ class MainFrame(wx.Frame):
         
         dc = wx.PaintDC(self)
         dc.SetBrush(wx.RED_BRUSH if self.recording else wx.GREEN_BRUSH)
-        w, h = self.GetSize()
-        dc.DrawRectangle(0,0,w,h)
+        #w, h = self.GetSize()
+        dc.DrawRectangle(self.box[0] - 2,self.box[1] - 2,self.box[2] + 2,self.box[3] + 2) # 起点/终点各有2px的偏移,原因未知
 
     def OnEraseBG(self, evt):
         """擦除背景事件处理"""
