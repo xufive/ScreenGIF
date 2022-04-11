@@ -50,11 +50,11 @@ class MainFrame(wx.Frame):
         self.cfg = self.ReadConfig()        # 读取配置项
         self.SetWindowShape()               # 设置不规则窗口
         
-        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)                                  # 鼠标事件
+        self.Bind(wx.EVT_MOUSE_EVENTS, self.OnMouse)                                # 鼠标事件
         self.Bind(wx.EVT_PAINT, self.OnPaint)                                       # 窗口重绘
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBG)                          # 擦除背景
         self.Bind(wx.EVT_TIMER, self.OnTimer, self.timer)                           # 定时器
-        self.Bind(wx.EVT_SIZE, self.OnMainResize)                           
+        self.Bind(wx.EVT_SIZE, self.OnMainResize)                                   # 窗口大小调整
         
         self.taskBar.Bind(wx.adv.EVT_TASKBAR_RIGHT_UP, self.OnTaskBar)              # 右键单击托盘图标
         self.taskBar.Bind(wx.adv.EVT_TASKBAR_LEFT_UP, self.OnTaskBar)               # 左键单击托盘图标
@@ -108,9 +108,9 @@ class MainFrame(wx.Frame):
         self.SetShape(path) # 设置异形窗口形状
 
     def OnMainResize(self, evt):
+        '''调整窗口大小事件'''
         self.box[2] = evt.GetSize()[0]
         self.box[3] = evt.GetSize()[1]
-        print(self.box)
         self.SetWindowShape()
         self.Refresh()
 
@@ -128,7 +128,7 @@ class MainFrame(wx.Frame):
 
     def OnMouse(self, evt):
         """鼠标事件"""
-        self.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+        self.SetCursor(wx.Cursor(wx.CURSOR_HAND)) # 设置光标
         self.moveWindow(self.GetHandle())
                 
     def OnPaint(self, evt):
@@ -177,7 +177,7 @@ class MainFrame(wx.Frame):
         self.encoding_size = (self.GetPosition()[0] + self.Border_thicknes,
                                 self.GetPosition()[1] + self.Border_thicknes,
                                 self.box[2] - 2 * self.Border_thicknes,
-                                self.box[3] - 2 * self.Border_thicknes) # 截图区域
+                                self.box[3] - 2 * self.Border_thicknes) # 截图区域(起点X,起点Y,终点X,终点Y)
 
         img = ImageGrab.grab((self.encoding_size[0]+10,
                                 self.encoding_size[1]+10,
@@ -199,7 +199,7 @@ class MainFrame(wx.Frame):
         """隐藏窗口"""
 
         self.Iconize(True)
-        self.Hide() # 隐藏窗口,因为使用最小化时边框无法错误地无法隐藏
+        self.Hide() # 隐藏窗口,因为使用最小化时边框错误地无法隐藏
 
     def OnRec(self, evt):
         """开始/停止录制菜单事件处理"""
